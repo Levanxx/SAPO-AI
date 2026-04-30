@@ -1,15 +1,29 @@
 import os
 import librosa
 
-carpeta = "data/raw/"
-formatos_validos = (".wav", ".mp3", ".flac", ".ogg")
+def cargar_audio(ruta):
+    try:
+        audio, sr = librosa.load(ruta, sr=None)
+        return audio, sr
+    except Exception as e:
+        print(f"Error cargando {ruta}: {e}")
+        return None, None
 
-for archivo in os.listdir(carpeta):
-    if archivo.lower().endswith(formatos_validos):
+
+def cargar_dataset(carpeta):
+    datos = []
+
+    for archivo in os.listdir(carpeta):
         ruta = os.path.join(carpeta, archivo)
-        
-        try:
-            audio, sr = librosa.load(ruta, sr=None)
-            print(f"{archivo} → OK")
-        except Exception as e:
-            print(f"{archivo} → ERROR")
+
+        if archivo.endswith((".wav", ".mp3")):
+            audio, sr = cargar_audio(ruta)
+
+            if audio is not None:
+                datos.append({
+                    "archivo": archivo,
+                    "audio": audio,
+                    "sample_rate": sr
+                })
+
+    return datos
