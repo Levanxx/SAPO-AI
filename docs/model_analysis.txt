@@ -1,0 +1,32 @@
+ANÁLISIS FINAL DE RESULTADOS DEL MODELO
+
+Durante el Sprint 54 se realizó el análisis final de resultados del sistema de detección de disparos basado en Machine Learning. Se evaluó el desempeño del modelo Random Forest utilizando métricas de clasificación y la matriz de confusión generada durante las etapas anteriores.
+
+Los resultados obtenidos demostraron un rendimiento elevado y estable, alcanzando un accuracy de 96.89%, junto con altos valores de precision, recall y f1-score. Esto evidencia que el modelo posee una gran capacidad para distinguir correctamente entre audios de disparos y audios no relacionados.
+
+Asimismo, la matriz de confusión permitió observar que la cantidad de errores de clasificación fue reducida, registrando únicamente 31 falsos positivos y 17 falsos negativos. Estos resultados confirman que el modelo presenta un comportamiento robusto y adecuado para aplicaciones de detección automática de disparos.
+
+La comparación realizada entre Logistic Regression y Random Forest permitió seleccionar este último como modelo principal del proyecto, debido a su mejor rendimiento general y mayor capacidad predictiva.
+
+RESULTADOS FINALES
+
+Accuracy: 0.9689
+Precision: 0.9577
+Recall: 0.9763
+F1-Score: 0.9669
+
+MATRIZ DE CONFUSIÓN
+
+[[793  31]
+ [ 17 701]]
+
+INTERPRETACIÓN
+
+- 793 audios NO DISPARO fueron clasificados correctamente.
+- 701 audios DISPARO fueron detectados correctamente.
+- Se registraron únicamente 31 falsos positivos.
+- Se registraron únicamente 17 falsos negativos.
+
+CONCLUSIÓN
+
+El modelo Random Forest logró un desempeño sobresaliente en la clasificación de audios, demostrando alta precisión, estabilidad y una baja tasa de errores. El sistema quedó preparado para futuras integraciones con aplicaciones web, APIs o sistemas de monitoreo en tiempo real para detección automática de disparos.
