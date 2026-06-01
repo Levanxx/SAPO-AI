@@ -94,20 +94,16 @@ DeteccionDeDisparos/
 
 
 # Pipeline del Sistema
-```
-Audio WAV/MP3
-        ↓
-Carga y Validación
-        ↓
-Preprocesamiento
-        ↓
-Extracción de Features
-        ↓
-Features.csv
-        ↓
-Modelo de Machine Learning
-        ↓
-Clasificación Final
+```mermaid
+flowchart LR
+    A["🎵 Entrada de Audio"] --> B["🧹 Preprocesamiento"]
+    B --> C["📊 Extracción de Features"]
+    C --> D["💾 Features.csv"]
+    D --> E["🤖 Machine Learning"]
+    E --> F["🎯 Resultado"]
+
+    F -->|Disparo| G["🔫 Gunshot"]
+    F -->|No Disparo| H["🔇 Other Sound"]
 ```
 ---
 # Procesamiento de Audio
