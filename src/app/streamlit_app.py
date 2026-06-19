@@ -173,6 +173,70 @@ def mostrar_mapa(lat, lon, direccion):
         pass
 
 
+def mostrar_mapa_con_gps():
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+            body { margin: 0; background: #0b1326; font-family: sans-serif; }
+            #map { height: 400px; width: 100%; border-radius: 12px; }
+            #address { padding: 12px; background: rgba(19,27,46,0.9); border-radius: 8px; margin-top: 8px; color: #dae2fd; font-size: 14px; }
+            #status { color: #adc6ff; padding: 8px 0; font-size: 14px; }
+        </style>
+    </head>
+    <body>
+        <div id="status">📍 Obteniendo ubicación GPS...</div>
+        <div id="map"></div>
+        <div id="address"></div>
+        <script>
+        var map, marker;
+        function initMap(lat, lon) {
+            if (!map) {
+                map = L.map('map').setView([lat, lon], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+            } else { map.setView([lat, lon], 16); }
+            if (marker) marker.remove();
+            marker = L.marker([lat, lon]).addTo(map);
+        }
+        function reverseGeocode(lat, lon) {
+            fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('address').innerHTML = '📍 <b>Dirección:</b> ' + (data.display_name || 'No disponible');
+                    document.getElementById('status').style.display = 'none';
+                })
+                .catch(() => {
+                    document.getElementById('address').innerHTML = '📍 Dirección no disponible';
+                    document.getElementById('status').style.display = 'none';
+                });
+        }
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    initMap(pos.coords.latitude, pos.coords.longitude);
+                    reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+                },
+                function(err) {
+                    document.getElementById('status').innerHTML = '❌ Permiso de ubicación denegado. Actívalo en tu navegador.';
+                    document.getElementById('status').style.color = '#ff6b6b';
+                },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            document.getElementById('status').innerHTML = '❌ GPS no soportado';
+        }
+        </script>
+    </body>
+    </html>
+    """
+    st.components.v1.html(html, height=500)
+
+
 def predecir_audio(audio_file):
     model = joblib.load(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
@@ -279,11 +343,11 @@ if uploaded_file is not None:
     st.audio(uploaded_file)
     if st.button("Analizar audio"):
         resultado, confianza = predecir_audio(uploaded_file)
-
         if resultado == "DISPARO":
-            st.error("DISPARO DETECTADO")
+            st.error(f"❌ DISPARO DETECTADO — Confianza: {confianza}%")
+            mostrar_mapa_con_gps()
         else:
-            st.success("NO SE DETECTÓ DISPARO")
+            st.success(f"✅ NO SE DETECTÓ DISPARO — Confianza: {confianza}%")
 
 else:
 

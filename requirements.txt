@@ -8,4 +8,6 @@ streamlit
 joblib
 pytest
 soundfile
+streamlit-folium
+streamlit-js-eval
 folium
