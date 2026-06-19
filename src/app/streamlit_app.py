@@ -144,6 +144,33 @@ def obtener_ubicacion_por_ip():
             }
     return None
 
+def reverse_geocode(lat, lon):
+    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+    headers = {"User-Agent": "AcousticForensicsML/1.0"}
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            return response.json().get("display_name", "")
+    except:
+        pass
+    return ""
+
+def mostrar_mapa(lat, lon, direccion):
+    import tempfile
+    mapa = folium.Map(location=[lat, lon], zoom_start=15)
+    folium.Marker(
+        [lat, lon],
+        popup=direccion[:100],
+        tooltip="Ubicación detectada",
+        icon=folium.Icon(color="red", icon="info-sign")
+    ).add_to(mapa)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as f:
+        mapa.save(f.name)
+        st.iframe(f.name, height=400)
+    try:
+        os.unlink(f.name)
+    except:
+        pass
 
 
 def predecir_audio(audio_file):
