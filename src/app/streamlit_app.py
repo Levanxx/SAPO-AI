@@ -4,6 +4,7 @@ import librosa
 import joblib
 import tempfile
 from pathlib import Path
+from moviepy import VideoFileClip
 
 import requests
 import folium
@@ -15,82 +16,15 @@ st.set_page_config(
     layout="wide"
 )
 
-# =========================
-# ESTILOS
-# =========================
-
 st.markdown("""
 <style>
-    .stApp {
-        background-color: #0b1326;
-        color: #dae2fd;
-    }
-
-    section[data-testid="stSidebar"] {
-        background-color: #060e20;
-    }
-
-    .main-title {
-        font-size: 38px;
-        font-weight: 700;
-        color: #dae2fd;
-        margin-bottom: 5px;
-    }
-
-    .subtitle {
-        color: #adc6ff;
-        font-size: 13px;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        margin-bottom: 25px;
-    }
-
-    .card {
-        background: rgba(19, 27, 46, 0.9);
-        border: 1px solid rgba(173, 198, 255, 0.15);
-        border-radius: 12px;
-        padding: 24px;
-        margin-bottom: 20px;
-    }
-
-    .upload-card {
-        border: 2px dashed rgba(173, 198, 255, 0.35);
-        border-radius: 12px;
-        padding: 40px;
-        text-align: center;
-        background: rgba(19, 27, 46, 0.65);
-    }
-
-    .danger {
-        background-color: #93000a;
-        color: #ffdad6;
-        padding: 10px 16px;
-        border-radius: 6px;
-        font-weight: bold;
-        display: inline-block;
-    }
-
-    .safe {
-        background-color: #00320e;
-        color: #72fe88;
-        padding: 10px 16px;
-        border-radius: 6px;
-        font-weight: bold;
-        display: inline-block;
-    }
-
-    .metric-label {
-        color: #c1c6d7;
-        font-size: 13px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    .metric-value {
-        font-size: 26px;
-        font-weight: bold;
-        color: #adc6ff;
-    }
+    .stApp { background-color: #0b1326; color: #dae2fd; }
+    section[data-testid="stSidebar"] { background-color: #060e20; }
+    .main-title { font-size: 38px; font-weight: 700; color: #dae2fd; margin-bottom: 5px; }
+    .subtitle { color: #adc6ff; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 25px; }
+    .card { background: rgba(19, 27, 46, 0.9); border: 1px solid rgba(173, 198, 255, 0.15); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .upload-card { border: 2px dashed rgba(173, 198, 255, 0.35); border-radius: 12px; padding: 40px; text-align: center; background: rgba(19, 27, 46, 0.65); }
+    .metric-label { color: #c1c6d7; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -130,48 +64,24 @@ def extraer_features(audio_path):
 
     return features
 
-def obtener_ubicacion_por_ip():
-    response = requests.get("http://ip-api.com/json/", timeout=5)
-    if response.status_code == 200:
-        data = response.json()
-        if data.get("status") == "success":
-            return {
-                "lat": data["lat"],
-                "lon": data["lon"],
-                "ciudad": data.get("city", ""),
-                "region": data.get("regionName", ""),
-                "pais": data.get("country", "")
-            }
-    return None
+def convertir_video_a_audio(video_path):
+    audio_path = video_path + ".wav"
 
-def reverse_geocode(lat, lon):
-    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-    headers = {"User-Agent": "AcousticForensicsML/1.0"}
-    try:
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 200:
-            return response.json().get("display_name", "")
-    except:
-        pass
-    return ""
+    video = VideoFileClip(video_path)
 
-def mostrar_mapa(lat, lon, direccion):
-    import tempfile
-    mapa = folium.Map(location=[lat, lon], zoom_start=15)
-    folium.Marker(
-        [lat, lon],
-        popup=direccion[:100],
-        tooltip="Ubicación detectada",
-        icon=folium.Icon(color="red", icon="info-sign")
-    ).add_to(mapa)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as f:
-        mapa.save(f.name)
-        st.iframe(f.name, height=400)
-    try:
-        os.unlink(f.name)
-    except:
-        pass
+    if video.audio is None:
+        video.close()
+        raise ValueError("El video no tiene audio.")
 
+    video.audio.write_audiofile(
+        audio_path,
+        codec="pcm_s16le",
+        logger=None
+    )
+
+    video.close()
+
+    return audio_path
 
 def mostrar_mapa_con_gps():
     html = """
@@ -236,14 +146,20 @@ def mostrar_mapa_con_gps():
     """
     st.components.v1.html(html, height=500)
 
-
-def predecir_audio(audio_file):
+def predecir_audio(uploaded_file):
     model = joblib.load(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-        temp_audio.write(audio_file.read())
-        temp_audio_path = temp_audio.name
+    extension = uploaded_file.name.split(".")[-1].lower()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}") as temp_file:
+        temp_file.write(uploaded_file.read())
+        temp_file_path = temp_file.name
+
+    if extension in ["mp4", "mov", "avi"]:
+        temp_audio_path = convertir_video_a_audio(temp_file_path)
+    else:
+        temp_audio_path = temp_file_path
 
     features = extraer_features(temp_audio_path)
 
@@ -260,19 +176,20 @@ def predecir_audio(audio_file):
     )
 
     prediction = model.predict(scaled_df)[0]
-
     probabilities = model.predict_proba(scaled_df)[0]
-
     confidence = max(probabilities) * 100
+
+    try:
+        os.unlink(temp_file_path)
+        if temp_audio_path != temp_file_path:
+            os.unlink(temp_audio_path)
+    except:
+        pass
 
     if prediction == 1:
         return "DISPARO", round(confidence, 2)
     else:
         return "NO DISPARO", round(confidence, 2)
-
-# =========================
-# SIDEBAR
-# =========================
 
 st.sidebar.title("AcousticForensics ML")
 st.sidebar.caption("Forensic Unit · Precision ML v4.2")
@@ -287,16 +204,8 @@ st.sidebar.button("Settings")
 st.sidebar.markdown("---")
 st.sidebar.button("+ New Analysis")
 
-# =========================
-# HEADER
-# =========================
-
 st.markdown('<div class="subtitle">Módulo de Vigilancia Activa</div>', unsafe_allow_html=True)
 st.markdown('<div class="main-title">Terminal de Análisis Acústico</div>', unsafe_allow_html=True)
-
-# =========================
-# LAYOUT
-# =========================
 
 col_main, col_side = st.columns([2.2, 1])
 
@@ -304,33 +213,26 @@ with col_main:
 
     st.markdown("""
     <div class="upload-card">
-        <h3>Subir Archivo de Audio</h3>
-        <p>Arrastra o selecciona un archivo WAV o MP3 para análisis acústico.</p>
+        <h3>Subir Archivo de Audio o Video</h3>
+        <p>Arrastra o selecciona un archivo WAV, MP3, MP4, MOV o AVI para análisis acústico.</p>
     </div>
     """, unsafe_allow_html=True)
 
     uploaded_file = st.file_uploader(
-    "Selecciona un archivo de audio",
-    type=["wav", "mp3"]
-)
-
-# =========================================
-# VALIDACIÓN DE AUDIO
-# =========================================
+        "Selecciona un archivo de audio o video",
+        type=["wav", "mp3", "mp4", "mov", "avi"]
+    )
 
 if uploaded_file is not None:
 
-    # Mostrar mensaje
     st.success("Archivo cargado correctamente.")
 
-    # Información del archivo
     file_details = {
         "Nombre": uploaded_file.name,
         "Tipo": uploaded_file.type,
         "Tamaño (KB)": round(uploaded_file.size / 1024, 2)
     }
 
-    # Tarjeta de información
     st.markdown("""
     <div class="card">
         <p class="metric-label">ARCHIVO CARGADO</p>
@@ -339,21 +241,31 @@ if uploaded_file is not None:
 
     st.write(file_details)
 
-    # Reproductor de audio
-    st.audio(uploaded_file)
-    if st.button("Analizar audio"):
-        resultado, confianza = predecir_audio(uploaded_file)
-        if resultado == "DISPARO":
-            st.error(f"❌ DISPARO DETECTADO — Confianza: {confianza}%")
-            mostrar_mapa_con_gps()
-        else:
-            st.success(f"✅ NO SE DETECTÓ DISPARO — Confianza: {confianza}%")
+    extension = uploaded_file.name.split(".")[-1].lower()
+
+    if extension in ["wav", "mp3"]:
+        st.audio(uploaded_file)
+    else:
+        st.video(uploaded_file)
+
+    if st.button("Analizar archivo"):
+        try:
+            resultado, confianza = predecir_audio(uploaded_file)
+
+            if resultado == "DISPARO":
+                st.error(f"DISPARO DETECTADO — Confianza: {confianza}%")
+                mostrar_mapa_con_gps()
+            else:
+                st.success(f"NO SE DETECTÓ DISPARO — Confianza: {confianza}%")
+
+        except ValueError as e:
+            st.error(str(e))
+        except Exception as e:
+            st.error(f"Ocurrió un error al analizar el archivo: {e}")
 
 else:
 
-    st.warning(
-        "Aún no se ha cargado ningún archivo de audio."
-    )
+    st.warning("Aún no se ha cargado ningún archivo de audio o video.")
 
     st.markdown("""
     <div class="card">

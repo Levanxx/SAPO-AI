@@ -11,3 +11,4 @@ soundfile
 streamlit-folium
 streamlit-js-eval
 folium
+moviepy
