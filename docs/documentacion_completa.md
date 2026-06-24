@@ -2,7 +2,7 @@
 
 ## 1. Resumen del proyecto
 
-**DeteccionDeDisparos** es un sistema de deteccion de disparos basado en analisis acustico y Machine Learning. El proyecto toma archivos de audio, los normaliza, extrae caracteristicas acusticas, entrena modelos de clasificacion binaria y expone una interfaz en Streamlit para analizar audios subidos por el usuario.
+**DeteccionDeDisparos** es un sistema de deteccion de disparos basado en analisis acustico y Machine Learning. El proyecto toma archivos de audio, los normaliza, extrae caracteristicas acusticas, entrena modelos de clasificacion binaria y expone una interfaz en Streamlit para analizar archivos de audio o video subidos por el usuario.
 
 La clasificacion principal del sistema tiene dos salidas:
 
@@ -11,7 +11,7 @@ La clasificacion principal del sistema tiene dos salidas:
 | 1 | `disparos` | El audio contiene un evento acustico clasificado como disparo. |
 | 0 | `no_disparos` | El audio no corresponde a un disparo. |
 
-El objetivo es distinguir eventos de disparo frente a otros sonidos usando caracteristicas extraidas de la senal de audio, como MFCC, energia RMS, Zero Crossing Rate y descriptores espectrales.
+El objetivo es distinguir eventos de disparo frente a otros sonidos usando caracteristicas extraidas de la senal de audio, como MFCC, energia RMS, Zero Crossing Rate y descriptores espectrales. Cuando la entrada es video, el sistema extrae primero la pista de audio del archivo y luego aplica el mismo flujo acustico de clasificacion.
 
 ## 2. Estructura general del repositorio
 
@@ -69,7 +69,7 @@ DeteccionDeDisparos/
 
 ## 3. Flujo completo del pipeline
 
-El pipeline implementado es acustico. El flujo principal parte de carpetas con audios organizados por clase, genera un dataset de features, escala esas variables, entrena modelos, guarda el mejor modelo y finalmente permite usarlo desde una app.
+El pipeline de entrenamiento es acustico. El flujo principal parte de carpetas con audios organizados por clase, genera un dataset de features, escala esas variables, entrena modelos, guarda el mejor modelo y finalmente permite usarlo desde una app. En inferencia, la app puede recibir audio directamente o video; si recibe video, primero convierte la pista de audio a WAV temporal y despues ejecuta el mismo clasificador.
 
 ```mermaid
 flowchart TD
@@ -84,6 +84,9 @@ flowchart TD
     I --> J["Evaluacion, matriz de confusion y comparacion"]
     J --> K["models/random_forest_model.pkl"]
     K --> L["Prediccion por src/app/predict.py o Streamlit"]
+    M["Video MP4/MOV/AVI en Streamlit"] --> N["Extraccion de audio con MoviePy"]
+    N --> O["WAV temporal"]
+    O --> L
 ```
 
 ## 4. Organizacion y trabajo de los datos
@@ -152,10 +155,10 @@ El cargador acepta:
 .wav, .mp3, .flac, .ogg
 ```
 
-La app Streamlit acepta carga de:
+La app Streamlit acepta carga de audio y video:
 
 ```text
-.wav, .mp3
+.wav, .mp3, .mp4, .mov, .avi
 ```
 
 ## 5. Preprocesamiento de audio
@@ -625,17 +628,36 @@ Funcion principal:
 predecir_audio(audio_file)
 ```
 
-Flujo:
+Flujo cuando el archivo subido es audio:
 
 1. Carga el modelo Random Forest.
 2. Carga el scaler.
 3. Guarda temporalmente el archivo subido por el usuario.
-4. Extrae features desde ese archivo temporal.
-5. Construye un DataFrame con las mismas 18 columnas usadas en entrenamiento.
-6. Aplica el scaler.
-7. Ejecuta `model.predict`.
-8. Ejecuta `model.predict_proba` para obtener confianza.
-9. Devuelve resultado y porcentaje de confianza.
+4. Detecta la extension del archivo.
+5. Si la extension es `wav` o `mp3`, usa directamente ese archivo temporal como entrada acustica.
+6. Extrae features desde ese archivo temporal.
+7. Construye un DataFrame con las mismas 18 columnas usadas en entrenamiento.
+8. Aplica el scaler.
+9. Ejecuta `model.predict`.
+10. Ejecuta `model.predict_proba` para obtener confianza.
+11. Elimina el archivo temporal.
+12. Devuelve resultado y porcentaje de confianza.
+
+Flujo cuando el archivo subido es video:
+
+1. Carga el modelo Random Forest.
+2. Carga el scaler.
+3. Guarda temporalmente el video subido por el usuario.
+4. Detecta la extension del archivo.
+5. Si la extension es `mp4`, `mov` o `avi`, llama a `convertir_video_a_audio`.
+6. Extrae la pista de audio del video y la guarda como WAV temporal.
+7. Extrae las mismas 18 features acusticas desde el WAV temporal.
+8. Construye un DataFrame con las mismas 18 columnas usadas en entrenamiento.
+9. Aplica el scaler.
+10. Ejecuta `model.predict`.
+11. Ejecuta `model.predict_proba` para obtener confianza.
+12. Elimina el video temporal y el WAV temporal.
+13. Devuelve resultado y porcentaje de confianza.
 
 ### 13.3 Extraccion de features dentro de la app
 
@@ -664,41 +686,91 @@ Si el resultado es `NO DISPARO`, muestra un mensaje de exito indicando que no se
 
 ## 14. Geolocalizacion y mapa
 
-La app Streamlit incluye funciones de ubicacion:
+La app Streamlit incluye una funcion de ubicacion basada en GPS del navegador:
 
 | Funcion | Proposito |
 |---|---|
-| `obtener_ubicacion_por_ip` | Consulta `http://ip-api.com/json/` para obtener ubicacion aproximada por IP. |
-| `reverse_geocode` | Consulta Nominatim de OpenStreetMap para convertir latitud/longitud en direccion. |
-| `mostrar_mapa` | Genera un mapa Folium con marcador. |
 | `mostrar_mapa_con_gps` | Inserta HTML/JavaScript con Leaflet y solicita geolocalizacion del navegador. |
 
-En el flujo actual, cuando se detecta un disparo, la app usa `mostrar_mapa_con_gps`, que depende del permiso de ubicacion del navegador.
+En el flujo actual, cuando se detecta un disparo, la app usa `mostrar_mapa_con_gps`, que depende del permiso de ubicacion del navegador. Dentro del HTML insertado se usa Leaflet para mostrar el mapa y Nominatim para obtener una direccion aproximada desde latitud y longitud.
 
 ## 15. Clasificacion desde video
 
-En el codigo actual no existe un pipeline implementado de clasificacion desde video. No hay modulos con OpenCV, procesamiento de frames, lectura de camara, lectura de archivos `.mp4`/`.avi` ni inferencia audiovisual.
+La clasificacion desde video ya esta implementada en `src/app/streamlit_app.py`. El enfoque no analiza imagenes ni frames; usa el video como contenedor multimedia, extrae su pista de audio y aplica el mismo clasificador acustico usado para archivos `.wav` y `.mp3`.
 
-Lo que si existe es:
+### 15.1 Formatos de video aceptados
 
-- Clasificacion desde audio.
-- Visualizacion de waveforms.
-- Interfaz Streamlit para subir audio.
-- Mapa/GPS cuando se detecta un disparo.
+La interfaz acepta:
 
-Por tanto, el proyecto no clasifica videos directamente en su estado actual. Para agregar video, una extension natural seria:
+```text
+.mp4, .mov, .avi
+```
 
-1. Recibir un archivo de video o stream de camara.
-2. Extraer la pista de audio del video.
-3. Dividir el audio en ventanas de 3 segundos.
-4. Aplicar el mismo preprocesamiento acustico del proyecto.
-5. Extraer las 18 features por ventana.
-6. Escalar con `models/scaler.pkl`.
-7. Clasificar cada ventana con `models/random_forest_model.pkl`.
-8. Marcar timestamps donde se detecten disparos.
-9. Opcionalmente, mostrar los frames o segmentos asociados.
+Estos formatos se habilitan en el `file_uploader` de Streamlit:
 
-Esta propuesta no esta implementada en el repositorio; se documenta como alcance futuro porque el proyecto disponible es acustico.
+```python
+type=["wav", "mp3", "mp4", "mov", "avi"]
+```
+
+### 15.2 Funcion de conversion de video a audio
+
+La conversion se realiza con:
+
+```python
+convertir_video_a_audio(video_path)
+```
+
+Flujo interno:
+
+1. Construye una ruta de salida agregando `.wav` al nombre temporal del video.
+2. Abre el archivo con `VideoFileClip(video_path)`.
+3. Verifica si el video tiene pista de audio.
+4. Si `video.audio is None`, cierra el video y lanza `ValueError("El video no tiene audio.")`.
+5. Si hay audio, escribe un WAV temporal con:
+
+```python
+video.audio.write_audiofile(
+    audio_path,
+    codec="pcm_s16le",
+    logger=None
+)
+```
+
+6. Cierra el objeto de video.
+7. Devuelve la ruta del WAV generado.
+
+### 15.3 Flujo de clasificacion desde video
+
+Cuando el usuario sube un video:
+
+1. Streamlit guarda el archivo subido en un archivo temporal con su extension original.
+2. `predecir_audio` identifica la extension con:
+
+```python
+extension = uploaded_file.name.split(".")[-1].lower()
+```
+
+3. Si la extension esta en `["mp4", "mov", "avi"]`, llama a `convertir_video_a_audio`.
+4. La pista de audio queda disponible como WAV temporal.
+5. `extraer_features` carga ese WAV con Librosa.
+6. Se calculan las 18 features acusticas: 13 MFCC, ZCR, RMS, spectral centroid, spectral bandwidth y spectral rolloff.
+7. Las features se organizan en un DataFrame con `FEATURE_COLUMNS`.
+8. Se escalan con `models/scaler.pkl`.
+9. Se clasifican con `models/random_forest_model.pkl`.
+10. Se obtiene la confianza con `model.predict_proba`.
+11. Se eliminan los temporales: video original y WAV extraido.
+12. La app devuelve `DISPARO` o `NO DISPARO`.
+
+### 15.4 Manejo de errores en video
+
+La app contempla dos casos:
+
+- Si el video no contiene audio, muestra el mensaje del `ValueError`.
+- Si ocurre otro error durante el analisis, muestra un mensaje general: `Ocurrio un error al analizar el archivo`.
+
+### 15.5 Alcance real del video
+
+La clasificacion desde video es una clasificacion acustica aplicada a la pista de audio del video. No hay deteccion visual de armas, fogonazos, personas, escenas, frames ni objetos. El video se usa para obtener sonido; la decision final sigue dependiendo del modelo Random Forest entrenado con features de audio.
 
 ## 16. Aplicacion Streamlit
 
@@ -710,7 +782,7 @@ src/app/streamlit_app.py
 
 ### 16.1 Proposito
 
-Crear una interfaz para subir un audio, ejecutar inferencia y mostrar el resultado de clasificacion.
+Crear una interfaz para subir un audio o video, ejecutar inferencia acustica y mostrar el resultado de clasificacion.
 
 ### 16.2 Configuracion visual
 
@@ -729,7 +801,7 @@ Tambien inyecta CSS personalizado para:
 - Fondo oscuro.
 - Sidebar.
 - Tarjetas.
-- Zona de subida de audio.
+- Zona de subida de audio o video.
 - Indicadores de alerta y resultado.
 
 ### 16.3 Controles principales
@@ -739,14 +811,15 @@ La interfaz contiene:
 - Sidebar con botones de navegacion visual.
 - Encabezado "Terminal de Analisis Acustico".
 - Zona de carga de archivo.
-- Reproductor de audio.
-- Boton "Analizar audio".
+- Reproductor de audio para `.wav` y `.mp3`.
+- Reproductor de video para `.mp4`, `.mov` y `.avi`.
+- Boton "Analizar archivo".
 - Panel lateral de detecciones y telemetria.
 
 ### 16.4 Tipos de archivo aceptados
 
 ```python
-type=["wav", "mp3"]
+type=["wav", "mp3", "mp4", "mov", "avi"]
 ```
 
 ### 16.5 Ejecucion local
@@ -878,19 +951,20 @@ El archivo `requirements.txt` contiene:
 | `librosa` | Carga de audio, resampling, MFCC, ZCR, RMS y features espectrales. |
 | `scikit-learn` | Modelos, train/test split, escalado, metricas, GridSearchCV. |
 | `jupyter` | Experimentacion en notebooks. |
-| `streamlit` | Interfaz web para carga y clasificacion de audio. |
+| `streamlit` | Interfaz web para carga y clasificacion de audio y video. |
 | `joblib` | Guardado y carga de modelo y scaler. |
 | `pytest` | Pruebas automatizadas. |
 | `soundfile` | Guardado de audios procesados en `.wav`. |
 | `streamlit-folium` | Integracion potencial de mapas Folium con Streamlit. |
 | `streamlit-js-eval` | Evaluacion JavaScript en Streamlit, util para integraciones de navegador. |
 | `folium` | Creacion de mapas y marcadores. |
+| `moviepy` | Lectura de videos y extraccion de la pista de audio a WAV temporal para clasificacion acustica. |
 
 Observaciones:
 
 - La app usa tambien `requests`, pero `requests` no aparece en `requirements.txt`.
 - La app usa mapas con Leaflet desde HTML externo.
-- No hay dependencias de video como `opencv-python`, `moviepy` o `ffmpeg-python`.
+- La clasificacion de video depende de `moviepy`. No usa OpenCV ni analisis visual de frames.
 
 ## 19. Pruebas automatizadas
 
@@ -1048,7 +1122,7 @@ Predice una clase desde un vector de features ya calculado.
 
 ### 20.19 `src/app/streamlit_app.py`
 
-App web para subir audio, extraer features, escalar, predecir, mostrar confianza y activar mapa GPS si detecta disparo.
+App web para subir audio o video, extraer la pista de audio cuando corresponde, calcular features, escalar, predecir, mostrar confianza y activar mapa GPS si detecta disparo.
 
 ### 20.20 `reports/sprint3_report.py`
 
@@ -1123,9 +1197,17 @@ El dataset no esta incluido por `.gitignore`.
 
 Recomendacion: documentar fuente, tamano, criterio de recoleccion, balance de clases y version del dataset en un archivo separado, por ejemplo `docs/dataset.md`, si se requiere trazabilidad academica o productiva.
 
-### 22.7 Video no implementado
+### 22.7 Alcance de la clasificacion de video
 
-No hay pipeline de video. Si el proyecto debe clasificar video, hace falta agregar dependencias, extraccion de audio desde video, segmentacion temporal y una interfaz para resultados por timestamp.
+El video ya se puede clasificar desde la app, pero la clasificacion se basa en la pista de audio extraida con MoviePy. No existe analisis visual de frames ni deteccion por imagen.
+
+Mejoras posibles:
+
+- Dividir videos largos en ventanas temporales para detectar en que segundo ocurre el disparo.
+- Reportar timestamps de deteccion.
+- Mostrar el fragmento de video asociado a cada alerta.
+- Unificar el preprocesamiento de audio extraido desde video con `src/data/load_data.py`.
+- Agregar pruebas automatizadas para videos con audio, videos sin audio y formatos no soportados.
 
 ## 23. Estado actual del proyecto
 
@@ -1140,12 +1222,14 @@ Implementado:
 - Optimizacion de Random Forest.
 - Guardado de modelo y scaler.
 - Evaluacion con metricas y matriz de confusion.
-- App Streamlit para clasificacion de audio.
+- App Streamlit para clasificacion de audio y video.
+- Extraccion de audio desde video con MoviePy.
 - Mapa GPS al detectar disparo.
 
 Parcial o pendiente:
 
-- Pipeline real de video.
+- Deteccion visual sobre frames de video.
+- Timestamps de deteccion dentro de videos largos.
 - Tests corregidos y ejecutables de forma limpia.
 - Workflow CI ubicado en `.github/workflows`.
 - Unificacion de preprocesamiento entre entrenamiento y app.
@@ -1165,6 +1249,8 @@ El proyecto funciona como un clasificador acustico binario:
 7. Se entrenan modelos supervisados.
 8. Random Forest queda como modelo principal.
 9. El modelo y el scaler se guardan en `models/`.
-10. La app permite subir audio, extraer features, escalar, predecir y mostrar resultado.
+10. La app permite subir audio o video.
+11. Si el archivo es video, extrae su pista de audio a WAV temporal con MoviePy.
+12. La app extrae features, escala, predice y muestra resultado.
 
-El sistema disponible es solido para el flujo de audio, pero todavia no implementa clasificacion desde video.
+El sistema disponible clasifica audio directamente y tambien clasifica videos a partir de su pista de audio.
