@@ -5,6 +5,10 @@ import joblib
 import tempfile
 from pathlib import Path
 
+import requests
+import folium
+import os
+
 st.set_page_config(
     page_title="AcousticForensics ML",
     page_icon="🎧",
@@ -126,6 +130,112 @@ def extraer_features(audio_path):
 
     return features
 
+def obtener_ubicacion_por_ip():
+    response = requests.get("http://ip-api.com/json/", timeout=5)
+    if response.status_code == 200:
+        data = response.json()
+        if data.get("status") == "success":
+            return {
+                "lat": data["lat"],
+                "lon": data["lon"],
+                "ciudad": data.get("city", ""),
+                "region": data.get("regionName", ""),
+                "pais": data.get("country", "")
+            }
+    return None
+
+def reverse_geocode(lat, lon):
+    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+    headers = {"User-Agent": "AcousticForensicsML/1.0"}
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            return response.json().get("display_name", "")
+    except:
+        pass
+    return ""
+
+def mostrar_mapa(lat, lon, direccion):
+    import tempfile
+    mapa = folium.Map(location=[lat, lon], zoom_start=15)
+    folium.Marker(
+        [lat, lon],
+        popup=direccion[:100],
+        tooltip="Ubicación detectada",
+        icon=folium.Icon(color="red", icon="info-sign")
+    ).add_to(mapa)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as f:
+        mapa.save(f.name)
+        st.iframe(f.name, height=400)
+    try:
+        os.unlink(f.name)
+    except:
+        pass
+
+
+def mostrar_mapa_con_gps():
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+            body { margin: 0; background: #0b1326; font-family: sans-serif; }
+            #map { height: 400px; width: 100%; border-radius: 12px; }
+            #address { padding: 12px; background: rgba(19,27,46,0.9); border-radius: 8px; margin-top: 8px; color: #dae2fd; font-size: 14px; }
+            #status { color: #adc6ff; padding: 8px 0; font-size: 14px; }
+        </style>
+    </head>
+    <body>
+        <div id="status">📍 Obteniendo ubicación GPS...</div>
+        <div id="map"></div>
+        <div id="address"></div>
+        <script>
+        var map, marker;
+        function initMap(lat, lon) {
+            if (!map) {
+                map = L.map('map').setView([lat, lon], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+            } else { map.setView([lat, lon], 16); }
+            if (marker) marker.remove();
+            marker = L.marker([lat, lon]).addTo(map);
+        }
+        function reverseGeocode(lat, lon) {
+            fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('address').innerHTML = '📍 <b>Dirección:</b> ' + (data.display_name || 'No disponible');
+                    document.getElementById('status').style.display = 'none';
+                })
+                .catch(() => {
+                    document.getElementById('address').innerHTML = '📍 Dirección no disponible';
+                    document.getElementById('status').style.display = 'none';
+                });
+        }
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    initMap(pos.coords.latitude, pos.coords.longitude);
+                    reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+                },
+                function(err) {
+                    document.getElementById('status').innerHTML = '❌ Permiso de ubicación denegado. Actívalo en tu navegador.';
+                    document.getElementById('status').style.color = '#ff6b6b';
+                },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            document.getElementById('status').innerHTML = '❌ GPS no soportado';
+        }
+        </script>
+    </body>
+    </html>
+    """
+    st.components.v1.html(html, height=500)
+
 
 def predecir_audio(audio_file):
     model = joblib.load(MODEL_PATH)
@@ -233,11 +343,11 @@ if uploaded_file is not None:
     st.audio(uploaded_file)
     if st.button("Analizar audio"):
         resultado, confianza = predecir_audio(uploaded_file)
-
         if resultado == "DISPARO":
-            st.error("DISPARO DETECTADO")
+            st.error(f"❌ DISPARO DETECTADO — Confianza: {confianza}%")
+            mostrar_mapa_con_gps()
         else:
-            st.success("NO SE DETECTÓ DISPARO")
+            st.success(f"✅ NO SE DETECTÓ DISPARO — Confianza: {confianza}%")
 
 else:
 
