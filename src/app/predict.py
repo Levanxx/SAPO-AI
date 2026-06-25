@@ -7,11 +7,11 @@ import joblib
 # =========================
 
 MODEL_PATH = Path(
-    "models/random_forest_model.pkl"
+    "models/sapo.pkl"
 )
 
 SCALER_PATH = Path(
-    "models/scaler.pkl"
+    "models/sapo_scaler.pkl"
 )
 
 # =========================
