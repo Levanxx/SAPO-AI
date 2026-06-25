@@ -1,349 +1,215 @@
-# Sistema Inteligente de Detección de Disparos mediante Análisis Acústico con Machine Learning
+# SAPO AI
 
-## Descripción del Proyecto
+**Sistema Acústico de Protección y Observación**
 
-El presente proyecto tiene como finalidad desarrollar un sistema inteligente capaz de detectar sonidos de disparos mediante análisis acústico y técnicas de Machine Learning.
+SAPO AI es una aplicación de inteligencia artificial para clasificación acústica de disparos. El sistema acepta archivos de audio y video; cuando la entrada es un video, extrae automáticamente la pista de audio y aplica un modelo de clasificación basado en **Random Forest** para determinar si el contenido corresponde a **DISPARO** o **NO DISPARO**.
 
-El sistema analizará archivos de audio para clasificarlos en dos categorías:
+Cuando SAPO AI detecta un disparo, la aplicación muestra una alerta y solicita acceso a la ubicación GPS del dispositivo para visualizar un mapa aproximado del punto de detección.
 
-* Disparos
-* No disparos
+## Objetivo del Sistema
 
-El proyecto integra conceptos de:
+Desarrollar un sistema de apoyo para la detección acústica de eventos asociados a disparos mediante técnicas de procesamiento digital de señales y aprendizaje automático. SAPO AI busca transformar archivos multimedia en evidencia acústica procesable, entregando una clasificación clara y una respuesta visual inmediata ante eventos críticos.
 
-* Inteligencia Artificial
-* Procesamiento Digital de Señales
-* Machine Learning
-* Ciencia de Datos
-* Ingeniería de Software
-* Automatización de pruebas
+## Problema que Resuelve
 
-La solución utiliza procesamiento acústico, extracción de características y modelos de clasificación para identificar eventos sonoros asociados a disparos en distintos entornos.
+La identificación manual de sonidos de disparos en grabaciones de audio o video puede ser lenta, subjetiva y difícil de escalar. SAPO AI automatiza este proceso mediante extracción de características acústicas y clasificación binaria, reduciendo el tiempo de análisis y facilitando la generación de alertas georreferenciadas cuando se detecta un posible disparo.
 
----
-# Objetivo
+## Tecnologías Utilizadas
 
-Desarrollar un modelo de clasificación de audio capaz de identificar disparos en grabaciones acústicas mediante técnicas de Machine Learning y procesamiento digital de señales.
+- **Python** como lenguaje principal.
+- **Streamlit** para la interfaz web interactiva.
+- **Librosa** para carga, procesamiento y extracción de características de audio.
+- **MoviePy** para extracción de audio desde archivos de video.
+- **NumPy** y **Pandas** para manejo numérico y tabular.
+- **Scikit-learn** para escalado, entrenamiento y evaluación del modelo.
+- **Joblib** para serialización de modelos y escaladores.
+- **Folium / Leaflet / OpenStreetMap** para visualización geoespacial.
+- **Pytest** para pruebas automatizadas.
 
----
+## Modelo Principal
 
+El modelo actual del proyecto se denomina **SAPO**. Es un clasificador Random Forest entrenado sobre características acústicas extraídas de audios etiquetados como `disparos` y `no_disparos`.
 
-# Tecnologías Utilizadas
+El modelo anterior se denomina **Sapito** y se conserva en el repositorio como versión previa del sistema:
 
-## Lenguaje Principal
+- `models/sapo.pkl`
+- `models/sapo_scaler.pkl`
+- `models/sapito.pkl`
+- `models/sapito_scaler.pkl`
 
-* Python
+## Métricas del Modelo Actual
 
-## Librerías
+SAPO alcanza un rendimiento aproximado de **97% de accuracy** en la evaluación disponible. El modelo limpio fue entrenado evitando data leakage: el escalador se ajusta únicamente con datos de entrenamiento y luego transforma los datos de prueba.
 
-* Librosa
-* NumPy
-* Matplotlib
-* Scikit-learn
-* Pandas
-* SoundFile
+Resultados reportados:
 
-## Herramientas
+| Métrica | Valor |
+|---|---:|
+| Accuracy | 96.89% |
+| Precision | 95.77% |
+| Recall | 97.63% |
+| F1-Score | 96.69% |
 
-* Git
-* GitHub
-* Visual Studio Code
-* Jira
+Revisión de overfitting:
 
----
+| Indicador | Valor |
+|---|---:|
+| Train Accuracy | 99.89% |
+| Test Accuracy | 96.89% |
+| Diferencia | 3% |
+| Cross Validation media | 97.15% |
 
-# Arquitectura del Proyecto
+**Conclusión:** no se observa overfitting fuerte.
 
-```plaintext
+## Pipeline de Clasificación
+
+```mermaid
+flowchart TD
+    A["Carga de audio o video"] --> B{"¿Es video?"}
+    B -->|Sí| C["Extracción automática de audio"]
+    B -->|No| D["Lectura directa del audio"]
+    C --> E["Extracción de características acústicas"]
+    D --> E
+    E --> F["Escalado de características"]
+    F --> G["Clasificación con Random Forest: SAPO"]
+    G --> H{"Resultado"}
+    H -->|DISPARO| I["Alerta y solicitud de GPS"]
+    H -->|NO DISPARO| J["Resultado sin alerta crítica"]
+    I --> K["Visualización de mapa"]
+```
+
+Etapas principales:
+
+1. Carga de archivo de audio o video.
+2. Extracción de audio si el archivo es video.
+3. Extracción de características acústicas.
+4. Escalado de características.
+5. Clasificación con Random Forest.
+6. Resultado binario: **DISPARO** o **NO DISPARO**.
+7. Alerta y visualización GPS si se detecta disparo.
+
+## Formatos Soportados
+
+La aplicación Streamlit soporta:
+
+- WAV
+- MP3
+- MP4
+- MOV
+- AVI
+
+## Estructura del Repositorio
+
+```text
 DeteccionDeDisparos/
-│
 ├── data/
-│   ├── raw/
-│   └── processed/
-│
-├── docs/
-│   └── documentación técnica
-│
-├── notebooks/
-│   └── experimentación y análisis
-│
-├── reports/
-│   └── reportes y resultados
-│
+│   ├── raw/                 # Dataset original, no versionado completamente
+│   ├── processed/           # Audios procesados y features generadas
+│   └── videos IA/           # Material de video local
+├── docs/                    # Documentación técnica de SAPO AI
+├── models/                  # Modelos y escaladores serializados
+├── notebooks/               # Espacio para experimentación
+├── reports/                 # Reportes del proyecto
 ├── src/
-│   ├── data/
-│   │   ├── load_data.py
-│   │   └── preprocess.py
-│   │
-│   ├── features/
-│   │   └── visualization.py
-│   │
-│   ├── models/
-│   └── utils/
-│
-├── tests/
-│   └── pruebas automatizadas
-│
-├── main.py
+│   ├── app/                 # Aplicación Streamlit y predicción
+│   ├── data/                # Carga, validación y preparación de datos
+│   ├── features/            # Extracción y visualización de características
+│   ├── models/              # Entrenamiento, evaluación y comparación
+│   └── preprocessing/       # Guardado de audio procesado
+├── tests/                   # Pruebas automatizadas
+├── main.py                  # Generación de features desde el dataset
 ├── requirements.txt
 └── README.md
-
 ```
 
----
+## Instalación del Entorno
 
-
-# Pipeline del Sistema
-```mermaid
-flowchart LR
-    A["🎵 Entrada de Audio"] --> B["🧹 Preprocesamiento"]
-    B --> C["📊 Extracción de Features"]
-    C --> D["💾 Features.csv"]
-    D --> E["🤖 Machine Learning"]
-    E --> F["🎯 Resultado"]
-
-    F -->|Disparo| G["🔫 Gunshot"]
-    F -->|No Disparo| H["🔇 Other Sound"]
-```
----
-# Procesamiento de Audio
-
-El sistema realiza diferentes etapas de procesamiento acústico:
-
-* Lectura de archivos WAV
-* Conversión mono
-* Estandarización de sample rate
-* Normalización de amplitud
-* Ajuste automático de duración
-* Padding y trimming
-* Extracción de MFCC
-* Generación de espectrogramas
-
-## Features Acústicas Utilizadas
-
-| Feature | Descripción |
-|---|---|
-| MFCC | Representación espectral basada en percepción humana |
-| Spectral Centroid | Centro de masa del espectro |
-| Zero Crossing Rate | Cambios de signo en la señal |
-| Chroma | Representación armónica |
-| RMS Energy | Energía promedio del audio |
-
----
-
-# PCA / t-SNE de Audios
-
-Se implementó una visualización mediante reducción de dimensionalidad usando PCA y t-SNE para analizar el comportamiento acústico de distintas clases de audio.
-
-## Clases Representadas
-
-| Clase | Color |
-|---|---|
-| Disparos | Rojo |
-| Ruido ambiente | Azul |
-| Vehículos | Verde |
-| Voces humanas | Amarillo |
-| Sirenas | Morado |
-
-Estas técnicas permiten visualizar cómo los sonidos se agrupan acústicamente en clusters diferenciados.
-
----
-
-# Machine Learning
-
-El sistema utiliza técnicas de Machine Learning para clasificar eventos acústicos.
-
-## Modelos Evaluados
-* Random Forest
-* SVM
-* XGBoost
-* Redes Neuronales
-
-## Métricas de Evaluación
-
-| Métrica | Objetivo |
-|---|---|
-| Accuracy | 90% |
-| Precision | 89% |
-| Recall | 91% |
-| F1-Score | 90% |
-
----
-
-# Pruebas Automatizadas
-
-El proyecto incorpora pruebas automatizadas para validar el correcto funcionamiento del sistema.
-
-## Scripts de Prueba
-
-| Script | Objetivo |
-|---|---|
-| test_audio_types.py | Validación de formatos de audio |
-| test_audio_not_empty.py | Verificación de audios válidos |
-| test_waveform.py | Validación de waveforms |
-| load_data.py | Verificación de carga de datasets |
-
-## Objetivos de las Pruebas
-* Garantizar integridad de datos
-* Validar procesamiento acústico
-* Detectar errores tempranos
-* Automatizar verificaciones del sistema
-
----
-
-
-# Funcionalidades Implementadas
-
-## Carga de Dataset
-
-* Lectura automática de audios
-* Clasificación automática por carpetas
-* Soporte para múltiples formatos de audio
-* Validación básica de errores
-
-## Carga Uniforme de Audio
-
-* Conversión de audios a mono
-* Estandarización de sample rate
-* Ajuste automático de duración
-* Padding y trimming automático
-
-## Visualización de Waveforms
-
-* Representación gráfica de señales acústicas
-* Visualización por clases
-* Comparación entre disparos y no disparos
-
----
-
-# Estado Actual del Proyecto
-
-## COMPLETADO 
-
-* Estructura del proyecto
-* Carga de datasets
-* Normalización de audios
-* Waveforms
-* Extracción inicial de features
-* Validación de datos
-* Visualizaciones acústicas
-* Configuración Git/GitHub
-* Pruebas automatizadas
-
-## EN DESARROLLO 
-
-* Entrenamiento del modelo
-* Evaluación de métricas
-* Split Train/Test
-* Optimización del pipeline
-
-## FUTURO 
-
-* Streamlit / FastAPI
-* Predicción en tiempo real
-* Despliegue en la nube
-* Optimización avanzada del modelo
-* Monitoreo online
-
----
-
-# Roles del Equipo
-
-| Rol                                   | Integrante | GitHub       |
-| ------------------------------------- | ---------- | ------------ |
-| Líder de Machine Learning             | Leonardo   | Levanxx      |
-| Responsable de Datos (Dataset)        | Jesus      | Yumecry      |
-| Responsable de Documentación Técnica  | Xiomara    | Xiomara306V  |
-| Desarrollador de Interfaz / Prototipo | Miguel     | mofuel       |
-| Responsable de Pruebas e Integración  | Jhoan      | JhoanAronith |
-
----
-
-# Metodología
-
-El proyecto sigue una metodología basada en:
-
-* CRISP-DM
-* Scrum
-* desarrollo iterativo incremental
-## Etapas CRISP-DM
-
-1. Comprensión del negocio
-2. Comprensión de datos
-3. Preparación de datos
-4. Modelado
-5. Evaluación
-6. Despliegue
----
-
-# Instalación
-
-## Clonar repositorio
-
-```bash
-git clone https://github.com/Levanxx/DeteccionDeDisparos.git
-```
-
-## Crear entorno virtual
-
-### Windows
-
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
-
-### macOS
+Desde la raíz del proyecto:
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-```
-
-## Instalar dependencias
-
-```bash
 pip install -r requirements.txt
 ```
 
----
+En Windows:
 
-# Ejecución
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+## Ejecución de la Aplicación
+
+```bash
+streamlit run src/app/streamlit_app.py
+```
+
+Luego, subir un archivo WAV, MP3, MP4, MOV o AVI y presionar **Analizar con SAPO**.
+
+## Entrenamiento y Evaluación
+
+Generar características acústicas:
 
 ```bash
 python main.py
 ```
 
-En macOS:
+Entrenar el modelo limpio, evitando data leakage:
 
 ```bash
-python3 main.py
+python src/models/train_random_forest_clean.py
 ```
 
----
+Evaluar overfitting:
 
-# Dataset
-
-* UrbanSound8K
-* Gunshot Audio Dataset
-* Firearms Audio Dataset – 58 Gun Types
-* Gunshot/Gunfire Audio Dataset
-
-## Organización
-
-```plaintext
-data/raw/disparos/
-data/raw/no_disparos/
+```bash
+python src/models/check_overfitting.py
 ```
 
----
+## Clasificación vs Predicción
 
-# Próximas Implementaciones
+En SAPO AI, **clasificación** es la tarea de asignar una entrada acústica a una clase definida: `DISPARO` o `NO DISPARO`. **Predicción** es el acto concreto de aplicar el modelo entrenado sobre un archivo nuevo para obtener una de esas clases. Por ello, el sistema realiza predicciones individuales dentro de un problema de clasificación binaria.
 
-* Integración con Streamlit
-* APIs con FastAPI
-* Predicción en tiempo real
-* Despliegue cloud
-* CNN para audio
-* Detección multi-evento
-* Monitoreo acústico inteligente
+## Uso de la Aplicación
+
+1. Activar el entorno virtual.
+2. Ejecutar Streamlit.
+3. Cargar un archivo de audio o video.
+4. Revisar la vista previa del archivo.
+5. Presionar **Analizar con SAPO**.
+6. Interpretar el resultado:
+   - **DISPARO:** se muestra alerta y solicitud de ubicación GPS.
+   - **NO DISPARO:** se informa que no se detectó disparo.
+
+## Limitaciones Actuales
+
+- El sistema depende de la calidad, duración y representatividad del dataset acústico.
+- La app clasifica el audio extraído de videos, pero todavía no analiza la imagen del video.
+- El mapa depende de permisos de ubicación del navegador y de servicios externos de mapas.
+- Los resultados no deben interpretarse como evidencia forense concluyente sin validación adicional.
+- El rendimiento puede variar frente a ruido extremo, ecos, grabaciones saturadas o dispositivos de baja calidad.
+
+## Mejoras Futuras
+
+- **SAPO Vision:** análisis visual del contenido de video.
+- **SAPO Fusion:** integración de señales acústicas y visuales.
+- Historial de detecciones y trazabilidad por fecha, archivo y ubicación.
+- Mejor integración de mapas y persistencia geoespacial.
+- Despliegue web con control de usuarios.
+- Evaluación con datasets más amplios y escenarios reales.
+
+## Documentación Técnica
+
+La documentación completa está organizada en:
+
+- [docs/overview.md](docs/overview.md)
+- [docs/pipeline.md](docs/pipeline.md)
+- [docs/model.md](docs/model.md)
+- [docs/usage.md](docs/usage.md)
+- [docs/evaluation.md](docs/evaluation.md)
+
+## Autor
+
+**Levanx**

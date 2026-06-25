@@ -1,12 +1,17 @@
-# Documentacion del proyecto
+# Documentación Técnica de SAPO AI
 
-Esta carpeta contiene la documentacion tecnica del sistema **DeteccionDeDisparos**.
+Esta carpeta contiene la documentación técnica del proyecto **SAPO AI**: **Sistema Acústico de Protección y Observación**.
 
 ## Documentos principales
 
-- [documentacion_completa.md](documentacion_completa.md): descripcion integral del proyecto, arquitectura, pipeline de datos, clasificacion desde audio y video, aplicacion Streamlit, entrenamiento, evaluacion, pruebas, dependencias y limitaciones actuales.
-- [model_analysis.txt](model_analysis.txt): resumen de resultados finales del modelo Random Forest, metricas y matriz de confusion.
+- [overview.md](overview.md): descripción general, objetivo, problema abordado, tecnologías y estructura del repositorio.
+- [pipeline.md](pipeline.md): flujo completo de carga, extracción de audio, extracción de características, escalado, clasificación y alerta GPS.
+- [model.md](model.md): explicación del modelo actual SAPO, el modelo anterior Sapito y la diferencia entre clasificación y predicción.
+- [usage.md](usage.md): instalación, activación del entorno, ejecución de la app, entrenamiento y uso de SAPO AI.
+- [evaluation.md](evaluation.md): métricas del modelo, revisión de overfitting, interpretación y limitaciones.
+- [documentacion_completa.md](documentacion_completa.md): versión integrada de la documentación.
+- [model_analysis.txt](model_analysis.txt): resumen histórico de resultados del modelo Random Forest.
 
-## Estado de esta documentacion
+## Alcance
 
-La documentacion fue elaborada a partir del codigo fuente disponible en el repositorio local. No se realizo push a GitHub.
+La documentación fue elaborada a partir del código fuente y los artefactos locales disponibles en la rama `Levanx`. No se realizaron commits ni push a GitHub.

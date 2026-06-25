@@ -1,32 +1,59 @@
-ANÁLISIS FINAL DE RESULTADOS DEL MODELO
+ANALISIS FINAL DE RESULTADOS - SAPO AI
 
-Durante el Sprint 54 se realizó el análisis final de resultados del sistema de detección de disparos basado en Machine Learning. Se evaluó el desempeño del modelo Random Forest utilizando métricas de clasificación y la matriz de confusión generada durante las etapas anteriores.
+Proyecto:
+SAPO AI - Sistema Acustico de Proteccion y Observacion
 
-Los resultados obtenidos demostraron un rendimiento elevado y estable, alcanzando un accuracy de 96.89%, junto con altos valores de precision, recall y f1-score. Esto evidencia que el modelo posee una gran capacidad para distinguir correctamente entre audios de disparos y audios no relacionados.
+Modelo actual:
+SAPO
 
-Asimismo, la matriz de confusión permitió observar que la cantidad de errores de clasificación fue reducida, registrando únicamente 31 falsos positivos y 17 falsos negativos. Estos resultados confirman que el modelo presenta un comportamiento robusto y adecuado para aplicaciones de detección automática de disparos.
+Modelo anterior:
+Sapito
 
-La comparación realizada entre Logistic Regression y Random Forest permitió seleccionar este último como modelo principal del proyecto, debido a su mejor rendimiento general y mayor capacidad predictiva.
+RESUMEN
+
+SAPO AI utiliza un modelo Random Forest para clasificacion acustica binaria de disparos. El sistema procesa archivos de audio y video; en el caso de videos, extrae la pista de audio antes de calcular caracteristicas acusticas y aplicar el clasificador.
+
+El modelo actual, SAPO, distingue entre dos clases:
+
+- DISPARO
+- NO DISPARO
+
+El modelo limpio fue entrenado evitando data leakage: la division train/test se realiza antes del escalado, y el scaler se ajusta unicamente con los datos de entrenamiento.
 
 RESULTADOS FINALES
 
-Accuracy: 0.9689
-Precision: 0.9577
-Recall: 0.9763
-F1-Score: 0.9669
+Accuracy aproximado: 97%
 
-MATRIZ DE CONFUSIÓN
+Metricas reportadas:
+
+Accuracy : 0.9689
+Precision: 0.9577
+Recall   : 0.9763
+F1-Score : 0.9669
+
+MATRIZ DE CONFUSION
 
 [[793  31]
  [ 17 701]]
 
-INTERPRETACIÓN
+INTERPRETACION
 
 - 793 audios NO DISPARO fueron clasificados correctamente.
 - 701 audios DISPARO fueron detectados correctamente.
-- Se registraron únicamente 31 falsos positivos.
-- Se registraron únicamente 17 falsos negativos.
+- Se registraron 31 falsos positivos.
+- Se registraron 17 falsos negativos.
 
-CONCLUSIÓN
+REVISION DE OVERFITTING
 
-El modelo Random Forest logró un desempeño sobresaliente en la clasificación de audios, demostrando alta precisión, estabilidad y una baja tasa de errores. El sistema quedó preparado para futuras integraciones con aplicaciones web, APIs o sistemas de monitoreo en tiempo real para detección automática de disparos.
+Train Accuracy        : 99.89%
+Test Accuracy         : 96.89%
+Diferencia            : 3%
+Cross Validation media: 97.15%
+
+CONCLUSION DE OVERFITTING
+
+No se observa overfitting fuerte. La diferencia entre entrenamiento y prueba se mantiene alrededor de 3%, y la validacion cruzada conserva una media cercana al rendimiento del conjunto de prueba.
+
+CONCLUSION GENERAL
+
+SAPO presenta un desempeno alto y estable para la clasificacion acustica de disparos dentro del dataset evaluado. El sistema esta preparado para operar desde la aplicacion Streamlit como clasificador de archivos WAV, MP3, MP4, MOV y AVI, con alerta y visualizacion GPS cuando detecta un resultado DISPARO.
