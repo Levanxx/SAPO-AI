@@ -6,6 +6,8 @@ import tempfile
 from pathlib import Path
 from moviepy import VideoFileClip
 import os
+from datetime import datetime
+import uuid
 
 st.set_page_config(
     page_title="SAPO AI",
@@ -124,6 +126,8 @@ st.markdown("""
 
 MODEL_PATH = Path("models/sapo.pkl")
 SCALER_PATH = Path("models/sapo_scaler.pkl")
+HISTORIAL_PATH = Path("data/historial_disparos.csv")
+HISTORIAL_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 FEATURE_COLUMNS = [
     "mfcc_1", "mfcc_2", "mfcc_3", "mfcc_4", "mfcc_5",
@@ -134,6 +138,54 @@ FEATURE_COLUMNS = [
     "spectral_bandwidth",
     "spectral_rolloff"
 ]
+
+def cargar_historial():
+    if HISTORIAL_PATH.exists():
+        return pd.read_csv(HISTORIAL_PATH)
+    return pd.DataFrame(columns=[
+        "id", "fecha", "hora", "resultado", "confianza",
+        "archivo", "latitud", "longitud", "direccion"
+    ])
+
+def guardar_evento_disparo(evento):
+    historial = cargar_historial()
+
+    if not historial.empty and evento["id"] in historial["id"].astype(str).values:
+        return
+
+    historial = pd.concat([historial, pd.DataFrame([evento])], ignore_index=True)
+    historial.to_csv(HISTORIAL_PATH, index=False)
+
+def procesar_evento_gps():
+    params = st.query_params
+
+    if "sapo_event_id" not in params:
+        return
+
+    event_id = params.get("sapo_event_id", "")
+    confianza = params.get("confianza", "")
+    archivo = params.get("archivo", "")
+    latitud = params.get("latitud", "")
+    longitud = params.get("longitud", "")
+    direccion = params.get("direccion", "")
+
+    ahora = datetime.now()
+
+    evento = {
+        "id": event_id,
+        "fecha": ahora.strftime("%Y-%m-%d"),
+        "hora": ahora.strftime("%H:%M:%S"),
+        "resultado": "DISPARO",
+        "confianza": confianza,
+        "archivo": archivo,
+        "latitud": latitud,
+        "longitud": longitud,
+        "direccion": direccion
+    }
+
+    guardar_evento_disparo(evento)
+
+procesar_evento_gps()
 
 def extraer_features(audio_path):
     y, sr = librosa.load(audio_path, sr=None)
@@ -177,7 +229,7 @@ def convertir_video_a_audio(video_path):
 
     return audio_path
 
-def mostrar_mapa_con_gps(confianza, archivo):
+def mostrar_mapa_con_gps(confianza, archivo, event_id):
     html = """
     <!DOCTYPE html>
     <html>
@@ -207,25 +259,19 @@ def mostrar_mapa_con_gps(confianza, archivo):
             if (marker) marker.remove();
             marker = L.marker([lat, lon]).addTo(map);
         }
+
+        function guardarEnStreamlit(lat, lon, direccion) {
+            navigator.sendBeacon("/?sapo_event_id={{EVENT_ID}}&confianza={{CONFIANZA}}&archivo={{ARCHIVO}}&latitud=" + lat + "&longitud=" + lon + "&direccion=" + encodeURIComponent(direccion || "No disponible"));
+        }
+
         function reverseGeocode(lat, lon) {
             fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json')
                 .then(r => r.json())
                 .then(data => {
-                    document.getElementById('address').innerHTML = '📍 <b>Dirección:</b> ' + (data.display_name || 'No disponible');
+                    var direccion = data.display_name || 'No disponible';
+                    document.getElementById('address').innerHTML = '📍 <b>Dirección:</b> ' + direccion;
                     document.getElementById('status').style.display = 'none';
-                })
-                .catch(() => {
-                    document.getElementById('address').innerHTML = '📍 Dirección no disponible';
-                    document.getElementById('status').style.display = 'none';
-                });
-        }
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                function(pos) {
-                    var lat = pos.coords.latitude;
-                    var lon = pos.coords.longitude;
-                    initMap(lat, lon);
-                    reverseGeocode(lat, lon);
+
                     navigator.sendBeacon("https://mofuel.app.n8n.cloud/webhook/b1b7a026-9424-4218-a1a1-d8d0fedebfbd", JSON.stringify({
                         resultado: "DISPARO",
                         confianza: "{{CONFIANZA}}",
@@ -234,6 +280,37 @@ def mostrar_mapa_con_gps(confianza, archivo):
                         archivo: "{{ARCHIVO}}",
                         timestamp: new Date().toISOString()
                     }));
+
+                    setTimeout(function() {
+                        guardarEnStreamlit(lat, lon, direccion);
+                    }, 900);
+                })
+                .catch(() => {
+                    document.getElementById('address').innerHTML = '📍 Dirección no disponible';
+                    document.getElementById('status').style.display = 'none';
+
+                    navigator.sendBeacon("https://mofuel.app.n8n.cloud/webhook/b1b7a026-9424-4218-a1a1-d8d0fedebfbd", JSON.stringify({
+                        resultado: "DISPARO",
+                        confianza: "{{CONFIANZA}}",
+                        latitud: lat,
+                        longitud: lon,
+                        archivo: "{{ARCHIVO}}",
+                        timestamp: new Date().toISOString()
+                    }));
+
+                    setTimeout(function() {
+                        guardarEnStreamlit(lat, lon, "No disponible");
+                    }, 900);
+                });
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    var lat = pos.coords.latitude;
+                    var lon = pos.coords.longitude;
+                    initMap(lat, lon);
+                    reverseGeocode(lat, lon);
                 },
                 function(err) {
                     document.getElementById('status').innerHTML = '❌ Permiso de ubicación denegado. Actívalo en tu navegador.';
@@ -250,6 +327,7 @@ def mostrar_mapa_con_gps(confianza, archivo):
     """
     html = html.replace("{{CONFIANZA}}", str(confianza))
     html = html.replace("{{ARCHIVO}}", archivo)
+    html = html.replace("{{EVENT_ID}}", event_id)
     st.components.v1.html(html, height=500)
 
 def predecir_audio(uploaded_file):
@@ -383,7 +461,26 @@ with col_main:
                         <p class="small-muted">El navegador solicitará permiso para acceder al GPS.</p>
                     </div>
                     """, unsafe_allow_html=True)
-                    mostrar_mapa_con_gps(confianza, uploaded_file.name)
+
+                    event_id = str(uuid.uuid4())
+
+                    ahora = datetime.now()
+
+                    evento = {
+                        "id": event_id,
+                        "fecha": ahora.strftime("%Y-%m-%d"),
+                        "hora": ahora.strftime("%H:%M:%S"),
+                        "resultado": "DISPARO",
+                        "confianza": confianza,
+                        "archivo": uploaded_file.name,
+                        "latitud": "Pendiente GPS",
+                        "longitud": "Pendiente GPS",
+                        "direccion": "Pendiente GPS"
+                    }
+
+                    guardar_evento_disparo(evento)
+
+                    mostrar_mapa_con_gps(confianza, uploaded_file.name, event_id)
                 else:
                     st.success(f"NO SE DETECTÓ DISPARO — Confianza: {confianza}%")
 
@@ -402,6 +499,24 @@ with col_main:
             <p class="small-muted">SAPO está listo para clasificar audio o video.</p>
         </div>
         """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="card">
+        <p class="metric-label">Historial de disparos detectados</p>
+        <h3>Registros guardados</h3>
+        <p class="small-muted">Cada detección positiva se guarda con fecha, hora, confianza, archivo y ubicación GPS.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    historial = cargar_historial()
+
+    if historial.empty:
+        st.info("Aún no hay disparos registrados.")
+    else:
+        st.dataframe(
+            historial.sort_values(by=["fecha", "hora"], ascending=False),
+            use_container_width=True
+        )
 
 with col_side:
     st.markdown("""
